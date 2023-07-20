@@ -1,12 +1,26 @@
 from flask import Flask
-from user_routes import user_bp
-from post_routes import post_bp
+import pymysql
 
 app = Flask(__name__)
 
-# Register Blueprints
+# กำหนดข้อมูลการเชื่อมต่อ MySQL
+db_config = {
+    'host': 'ananya1989.mysql.pythonanywhere-services.com',
+    'user': 'ananya1989',
+    'password': 'gingZAB28',
+    'db': 'ananya1989$default',
+    'charset': 'utf8mb4',
+    'cursorclass': pymysql.cursors.DictCursor
+}
+
+# สร้างฟังก์ชันเพื่อเชื่อมต่อกับ MySQL
+def connect_to_mysql():
+    connection = pymysql.connect(**db_config)
+    return connection
+
+# Register Blueprint
+from user_routes import user_bp
 app.register_blueprint(user_bp)
-app.register_blueprint(post_bp)
 
 if __name__ == '__main__':
     app.run()
