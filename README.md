@@ -39,3 +39,11 @@ CREATE TABLE user (
 
 INSERT INTO user (username, email, password)
 VALUES ('charlotte_aus', 'charlotte_aus@example.com', 'securepassword123');
+
+# 4> folder routes ต้องมีไฟล์ __init__.py ข้างใน และใน app.py จะมี from routes.user_routes import user_bp
+
+# 5> https://www.alphavantage.co/support/#api-key
+gingzab@gmail.com
+Welcome to Alpha Vantage! Your dedicated access key is: 1HHVSO4K609FRHJ0. Please record this API key at a safe place for future data access.
+
+

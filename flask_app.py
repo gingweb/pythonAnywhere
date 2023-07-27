@@ -7,6 +7,24 @@ import json
 import time
 import requests
 
+from flask import abort
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextSendMessage, QuickReplyButton, MessageAction, QuickReply
+
+
+from linebot.v3.messaging import (
+    Configuration,
+    ApiClient,
+    MessagingApi,
+    ReplyMessageRequest,
+    TextMessage
+)
+from linebot.v3.webhooks import (
+    MessageEvent,
+    TextMessageContent
+)
+
 app = Flask(__name__)
 
 def searchdataset1(name, data_summary):
@@ -86,6 +104,250 @@ def mapprovince(text_search):
                 }
     return result
 
+# ข้อมูลของ Channel ที่ได้จาก LINE Developer Console
+CHANNEL_ACCESS_TOKEN = "VG2PaYC529yhNFOhjFkaFUlrarnFUkJ2ADP0lcvUMsu63st8XxfD/npt5nF9wKXgQoVdAuD9BR1mk1Q4tRr7e14X6ZOObLGKL7XP9B5O0EUyDhx4GZbxc+kufvbNm7mHfRwecO6Vx3RW5H6JInCu5wdB04t89/1O/w1cDnyilFU="
+CHANNEL_SECRET = "826d6d14f3f30b49a7f4df115d9ef53d"
+
+line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(CHANNEL_SECRET)
+
+@app.route("/linewebhook", methods=["POST"])
+def linewebhook():
+    # รับข้อมูลที่ส่งมาจาก LINE server
+    signature = request.headers["X-Line-Signature"]
+    body = request.get_data(as_text=True)
+
+    try:
+        # ตรวจสอบความถูกต้องของ signature
+        print("start")
+        handler.handle(body, signature)
+        print("end try")
+
+    except InvalidSignatureError:
+        abort(400)
+
+    return "OK"
+
+
+@handler.add(MessageEvent, message=TextSendMessage)
+#@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    # ตรวจสอบว่าผู้ใช้ได้เลือก Quick Reply ประเภท Location หรือไม่
+    if event.message.quick_reply and event.message.quick_reply['type'] == 'location':
+        print("if yes location")
+
+        # ดึงค่า latitude และ longitude ที่ผู้ใช้เลือกจาก Quick Reply ประเภท Location
+        latitude = event.message.latitude
+        longitude = event.message.longitude
+
+        # ทำสิ่งที่คุณต้องการด้วยข้อมูล latitude และ longitude ที่ได้รับมา เช่น ค้นหาสถานที่ใกล้เคียง หรือแสดงผลแผนที่
+
+        # ตัวอย่างการตอบกลับด้วยข้อความ
+        reply_text = f"คุณเลือกตำแหน่งที่อยู่ที่ Latitude: {latitude}, Longitude: {longitude}"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+
+    else:
+        print("else not location")
+        # ตัวอย่างการส่ง Quick Reply ประเภท Location ให้ผู้ใช้เลือก
+        location_quick_reply = QuickReply(
+            items=[
+                QuickReplyButton(action=MessageAction(label="ส่งตำแหน่งที่อยู่", text="ส่งตำแหน่งที่อยู่", type="location"))
+            ]
+        )
+        reply_text = "กรุณาเลือกตำแหน่งที่อยู่ด้วยค่ะ"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text, quick_reply=location_quick_reply))
+
+
+# Default handler สำหรับเหตุการณ์ที่ไม่ได้รับการจัดการใน handler ที่กำหนดไว้
+@handler.default()
+def default(event):
+    # ตอบกลับข้อความหากไม่มี handler ที่ตรงกับเหตุการณ์ที่เกิดขึ้น
+
+    #ใช้งาน request ได้เลย
+    print ( request)
+    print (request.headers)
+    req_str = request.get_json() #dictionary
+    print ( req_str)
+
+    print ("---event---")
+    print (event)
+    print ( type(event))
+
+    req_body_json = ""
+
+    if hasattr(event, 'postback') and hasattr(event.postback, 'data'):
+        if (event.postback.data == "selected_date"):
+
+            req_body_json = request.get_data(as_text=True)
+            req_body = json.loads(req_body_json)  # แปลง JSON string เป็น Python Object
+
+            print ("pre-req_body")
+            print (req_body)
+
+            req_to_dialog =  {}
+             # เข้าถึง attribute ใน Python Object ได้และปรับปรุงค่าตามที่ต้องการ
+            if 'events' in req_body and len(req_body['events']) > 0:
+                eventdate = event.postback.params["date"]
+
+                #req_to_dialog =    {
+                #   "deliveryContext":req_body['events'][0]['deliveryContext'],
+                #   "message":{
+                #      "id": "465622370497855490",
+                #      "text":"DATE : " + str(eventdate),
+                #      "type":"text"
+                #   },
+                #   "mode":req_body['events'][0]['mode'],
+                #   "replyToken":req_body['events'][0]['replyToken'],
+                #   "source":req_body['events'][0]['source'],
+                #   "timestamp":req_body['events'][0]['timestamp'],
+                #   "type":"message",
+                #   "webhookEventId":req_body['events'][0]['webhookEventId']
+                #}
+
+                #new_event = [{"type": "text" , "text" : "DATE : " + str(eventdate)}]
+                #req_body['events'][0]['message']['type'] = 'text'
+                #req_body['events'][0]['message']['text'] = "DATE : " + str(eventdate)
+
+                #req_body["events"] = [{"type": "text" , "text" : "DATE : " + str(eventdate)}]
+
+            req_to_dialog =     {
+                               "events": [{
+                                    "type":"message",
+                                    "message":{
+                                          "id": "465622370497855491",
+                                          "text":"DATE : 2021-07-01",
+                                          "type":"text"
+                                    },
+                                    "webhookEventId":"01H68RK9B35J29PCCVX2CSHQ93",
+                                    "deliveryContext":{
+                                          "isRedelivery":"false"
+                                       },
+                                    "timestamp":1690363863996,
+                                    "source":{
+                                          "type":"user",
+                                          "userId":"Uc97188c81890dc69e1914ca6eb0d7582"
+                                       },
+                                    "replyToken":"f75742d16824498b9f807a22d54000ca",
+                                    "mode":"active"
+                                    }]
+                                }
+
+
+            # แปลงกลับเป็น JSON string อีกครั้งก่อนส่ง
+            req_body_json_updated = json.dumps(req_to_dialog)
+
+            print ("after-req_body_json_updated")
+            print (req_body_json_updated)
+
+            #ปลง Location Message ไปเป็น Text Message ก่อน โดยแปลงให้อยู่ในรูปแบบที่ dialogflow ตั้ง training phase ไว้
+
+            #ส่งค่าให้ dialogflow
+            dialogflow_url = "https://dialogflow.cloud.google.com/v1/integrations/line/webhook/d2688abb-d35d-44b9-a843-f3b82f0f05fc"
+            print (request.headers["host"])
+
+            # สร้าง object ใหม่ที่มี headers ใหม่โดยกำหนดค่า host ใหม่
+            req_headers = {
+                "host": "dialogflow.cloud.google.com",
+                "user-agent": request.headers.get("user-agent"),
+                "x-forwarded-host": "dialogflow.cloud.google.com",
+                "Content-Type": request.headers.get("Content-Type"),
+                "Content-Length": request.headers.get("Content-Length"),
+                "x-forwarded-for": request.headers.get("x-forwarded-for"),
+                "x-forwarded-proto": request.headers.get("x-forwarded-proto"),
+                "x-line-signature": request.headers.get("x-line-signature"),
+                "accept-encoding": request.headers.get("accept-encoding")
+            }
+
+            print (req_headers)
+            # ทำ HTTP POST request ไปยัง Dialogflow
+            response = requests.post(dialogflow_url, headers=req_headers , data=req_body_json_updated.encode('utf-8'))
+
+    elif (event.message.type == "image"):
+        img_id = event.message.id
+
+
+    elif (event.message.type == "location"):
+        address = event.message.address
+        location_id = event.message.id
+        latitude = event.message.latitude
+        longitude = event.message.longitude
+
+        print ("pre-req_body_json")
+        print (req_body_json)
+
+        req_body_json = request.get_data(as_text=True)
+        req_body = json.loads(req_body_json)  # แปลง JSON string เป็น Python Object
+
+        # เข้าถึง attribute ใน Python Object ได้และปรับปรุงค่าตามที่ต้องการ
+        if 'events' in req_body and len(req_body['events']) > 0:
+            req_body['events'][0]['message']['type'] = 'text'
+            req_body['events'][0]['message']['text'] = "LAT:"+str(latitude)+",LNG:"+str(longitude)
+
+        # แปลงกลับเป็น JSON string อีกครั้งก่อนส่ง
+        req_body_json_updated = json.dumps(req_body)
+
+        print ("after-location-req_body_json_updated")
+        print (req_body_json_updated)
+
+        #ปลง Location Message ไปเป็น Text Message ก่อน โดยแปลงให้อยู่ในรูปแบบที่ dialogflow ตั้ง training phase ไว้
+
+        #ส่งค่าให้ dialogflow
+        dialogflow_url = "https://dialogflow.cloud.google.com/v1/integrations/line/webhook/d2688abb-d35d-44b9-a843-f3b82f0f05fc"
+        print (request.headers["host"])
+
+        # สร้าง object ใหม่ที่มี headers ใหม่โดยกำหนดค่า host ใหม่
+        req_headers = {
+            "host": "dialogflow.cloud.google.com",
+            "user-agent": request.headers.get("user-agent"),
+            "x-forwarded-host": "dialogflow.cloud.google.com",
+            "Content-Type": request.headers.get("Content-Type"),
+            "Content-Length": request.headers.get("Content-Length"),
+            "x-forwarded-for": request.headers.get("x-forwarded-for"),
+            "x-forwarded-proto": request.headers.get("x-forwarded-proto"),
+            "x-line-signature": request.headers.get("x-line-signature"),
+            "accept-encoding": request.headers.get("accept-encoding")
+        }
+
+        print (req_headers)
+        # ทำ HTTP POST request ไปยัง Dialogflow
+        response = requests.post(dialogflow_url, headers=req_headers , data=req_body_json_updated.encode('utf-8'))
+
+        #reply_text = "ส่งไป dialogflow แล้วค่ะ"
+        #line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+
+
+    else:
+        #elif (event.message.type == "text"):
+        user_message = event.message.text
+
+        req_body_json = request.get_data(as_text=True)
+        print ("req_body_json")
+        print (req_body_json)
+
+        #ส่งค่าให้ dialogflow
+        dialogflow_url = "https://dialogflow.cloud.google.com/v1/integrations/line/webhook/d2688abb-d35d-44b9-a843-f3b82f0f05fc"
+        print (request.headers["host"])
+
+        # สร้าง object ใหม่ที่มี headers ใหม่โดยกำหนดค่า host ใหม่
+        req_headers = {
+            "host": "dialogflow.cloud.google.com",
+            "user-agent": request.headers.get("user-agent"),
+            "x-forwarded-host": "dialogflow.cloud.google.com",
+            "Content-Type": request.headers.get("Content-Type"),
+            "Content-Length": request.headers.get("Content-Length"),
+            "x-forwarded-for": request.headers.get("x-forwarded-for"),
+            "x-forwarded-proto": request.headers.get("x-forwarded-proto"),
+            "x-line-signature": request.headers.get("x-line-signature"),
+            "accept-encoding": request.headers.get("accept-encoding")
+        }
+
+        print (req_headers)
+        # ทำ HTTP POST request ไปยัง Dialogflow
+        response = requests.post(dialogflow_url, headers=req_headers , data=req_body_json.encode('utf-8'))
+
+        #reply_text = "ส่งไป dialogflow แล้วค่ะ"
+        #line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+
 @app.route('/dialogflow', methods = ['POST'])
 def dialogflow():
     content_type = request.headers.get('Content-Type')
@@ -99,6 +361,7 @@ def dialogflow():
         print (intent_name)
 
         jsonstr = 0
+
 
         if (intent_name == "projects/red-queen-v-1-vtgc/agent/intents/d7e90c6b-48b9-4a62-b3dc-625df6867569"):
             #ถามสภาพอากาศ
@@ -240,7 +503,7 @@ def dialogflow():
                                         +"\n"
                                         +"\nจาก ตำบล" + od_tambonO +" อำเภอ" + od_amphoeO + " ไปยัง ตำบล" + od_tambonD +" อำเภอ" + od_amphoeD
                                         +"\nจำนวนเที่ยวต่อเดือน(เที่ยว):  " + od_tripspermonth
-                                        +"\nปริมาณ(ตัน/เดือน):  "	+ od_tonpermonth
+                                        +"\nปริมาณ(ตัน/เดือน):  "   + od_tonpermonth
                                         +"\nระยะทางเฉลี่ย(กม.):  " + od_avgdistance
                                         +"\nระยะเวลาเฉลี่ย(นาที):  " + od_avgtraveltime
                                         +"\nความเร็วเฉลี่ย(กม/ชม):  " + od_avgspeed
@@ -253,6 +516,7 @@ def dialogflow():
                     print(i)
                     tblist.append(tbjson)
                     i=i+1
+
 
             else:
                 tbjson = {
@@ -303,7 +567,7 @@ def dialogflow():
             #                        "สินค้า:  " + otp_goodstype
             #                        +"\nเดือน:  " + otp_month +" ปี:  " + otp_year
             #                        +"\nจำนวนเที่ยวต่อเดือน(เที่ยว):  " + otp_tripspermonth
-            #                        +"\nปริมาณ(ตัน/เดือน):  "	+ otp_tonpermonth
+            #                        +"\nปริมาณ(ตัน/เดือน):  "  + otp_tonpermonth
             #                        +"\nระยะทางเฉลี่ย(กม.):  " + otp_avgdistance
             #                        +"\nระยะเวลาเฉลี่ย(นาที):  " + otp_avgtraveltime
             #                        +"\nความเร็วเฉลี่ย(กม/ชม):  " + otp_avgspeed
@@ -319,16 +583,16 @@ def dialogflow():
 
             #แกะ json - วน loop
             #data_summary.results.data_ste1[].
-            #ชนิดสินค้า						goodstype
-            #จำนวนเที่ยวต่อเดือน (เที่ยว		tripspermonth
-            #ปริมาณ(ตัน/เดือน)				tonpermonth
-            #ระยะทางเฉลี่ย	 (กม.)			avgdistance
-            #ระยะเวลาเฉลี่ย	 (นาที)			avgtraveltime
-            #ความเร็วเฉลี่ย	(กม/ชม)			avgspeed
-            #ปริมาณการขนส่ง (คัน-กม.)		tonskm
-            #ระยะการเดินทางรวม	 (คัน-กม.)	vkt
-            #ระยะเวลาเดินทางรวม (คัน-ชม.)	vht
-            #ค่าใช้จ่ายในการขนส่ง (บาท)	    	cost
+            #ชนิดสินค้า                     goodstype
+            #จำนวนเที่ยวต่อเดือน (เที่ยว        tripspermonth
+            #ปริมาณ(ตัน/เดือน)              tonpermonth
+            #ระยะทางเฉลี่ย   (กม.)          avgdistance
+            #ระยะเวลาเฉลี่ย  (นาที)         avgtraveltime
+            #ความเร็วเฉลี่ย (กม/ชม)         avgspeed
+            #ปริมาณการขนส่ง (คัน-กม.)       tonskm
+            #ระยะการเดินทางรวม   (คัน-กม.)  vkt
+            #ระยะเวลาเดินทางรวม (คัน-ชม.)   vht
+            #ค่าใช้จ่ายในการขนส่ง (บาท)         cost
 
 
 
@@ -336,7 +600,53 @@ def dialogflow():
 
             #สร้างการ์ดไลน์สวยๆ
 
+        elif (intent_name == "projects/red-queen-v-1-vtgc/agent/intents/1bb39eae-cfac-46a2-95df-0151f3ca9a19"):
+            #แจ้งเหตุ
+            print ('intent แจ้งเหตุ')
+            print (req_str)
+            jsonstr = {
+                          "fulfillmentMessages": [
+                            {
+                              "text": {
+                                "text": [
+                                  req_str
+                                ]
+                              }
+                            }
+                          ]
+                        }
 
+        elif (intent_name == "projects/red-queen-v-1-vtgc/agent/intents/6ab548e4-abe9-4725-a306-5d21d24dbdd9"):
+            #แจ้งเหต> สถานที่เกิดเหตุ
+            print ('intent แจ้งเหตุ> สถานที่เกิดเหตุ')
+            print (req_str)
+
+            jsonstr = {
+                          "fulfillmentMessages": [
+                            {
+                              "text": {
+                                "text": [
+                                  req_str
+                                ]
+                              }
+                            }
+                          ]
+                        }
+
+            #location
+            # ตรวจสอบว่ามีค่าพิกัดที่ส่งมาจาก Dialogflow หรือไม่
+            #if "queryResult" in req_str and "parameters" in req_str["queryResult"]:
+            #    parameters = req_str["queryResult"]["parameters"]
+            #    location = parameters["location"]
+
+                # ทำสิ่งที่คุณต้องการด้วยค่า location ที่ได้รับมาจาก Dialogflow
+
+                # ตัวอย่างการตอบกลับ Dialogflow ด้วยข้อความ
+            #    fulfillment_text = f"คุณเลือก Location: {location['latitude']}, {location['longitude']}"
+            #    response = {"fulfillmentText": fulfillment_text}
+            #    return jsonify(response)
+            #else:
+            #    return jsonify({})
 
         else:
 
@@ -476,3 +786,4 @@ def handle_request():
 @app.route('/hello')
 def hello_world():
     return 'Hello from Flask!'
+
