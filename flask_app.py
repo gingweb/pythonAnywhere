@@ -229,7 +229,8 @@ def default(event):
                                        },
                                     "replyToken":"f75742d16824498b9f807a22d54000ca",
                                     "mode":"active"
-                                    }]
+                                    }],
+                                "destination": "U79f910f9fc119e983be269f5e11942ab"
                                 }
 
 
